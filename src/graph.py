@@ -43,9 +43,9 @@ class Edge():
     def __init__(self, way, src, dest):
         self.way = way
         self.dest = dest
-        self.cost = src.node_dist(d)
-        if d.elev > src.elev:
-            self.cost += (d.elev-src.elev)*2
+        self.cost = src.node_dist(self.dest)
+        if self.dest.elev > src.elev:
+            self.cost += (self.dest.elev-src.elev)*2
             if self.way.type == 'steps':
                 self.cost *= 1.5
 
@@ -80,10 +80,10 @@ class Planner():
         costs[start] = 0
         while not q.empty():
             cnode = q.get()
-            if cnode == g:
+            if cnode == goal:
                 print("Path found, time will be",
-                      costs[g]*60/5000)  # 5 km/hr on flat
-                return self.make_path(parents, g)
+                      costs[goal]*60/5000)  # 5 km/hr on flat
+                return self.make_path(parents, goal)
             for edge in cnode.ways:
                 newcost = costs[cnode] + edge.cost
                 if edge.dest not in parents or newcost < costs[edge.dest]:
