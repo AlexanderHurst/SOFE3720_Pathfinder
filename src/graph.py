@@ -1,5 +1,7 @@
 import constants
 import math
+import struct
+import xml.etree.ElementTree as ET
 from queue import PriorityQueue
 
 
@@ -91,10 +93,10 @@ class Planner():
                     costs[edge.dest] = newcost
                     q.put(edge.dest)
 
-    def make_path(self, par, g):
+    def make_path(self, par, new):
         nodes = []
         ways = []
-        curr = g
+        curr = new
         nodes.append(curr)
         while par[curr] is not None:
             prev, way = par[curr]
@@ -104,3 +106,79 @@ class Planner():
         nodes.reverse()
         ways.reverse()
         return nodes, ways
+
+
+def build_elevs(efilename):
+    ''' read in elevations from a file. '''
+    efile = open(efilename)
+    estr = efile.read()
+    elevs = []
+    for spot in range(0, len(estr), 2):
+        elevs.append(struct.unpack('>h', estr[spot:spot+2])[0])
+    return elevs
+
+
+def build_graph(elevs):
+    ''' Build the search graph from the OpenStreetMap XML. '''
+    tree = ET.parse('dbv.osm')
+    root = tree.getroot()
+
+    nodes = dict()
+    ways = dict()
+    coastnodes = []
+    for item in root:
+        if item.tag == 'node':
+            coords = ((float)(item.get('lat')), (float)(item.get('lon')))
+            # row is 0 for 43N, 1201 (EPIX) for 42N
+            erow = (int)((43 - coords[0]) * constants.EPIX)
+            # col is 0 for 18 E, 1201 for 19 E
+            ecol = (int)((coords[1]-18) * constants.EPIX)
+            try:
+                el = elevs[erow*constants.EPIX+ecol]
+            except IndexError:
+                el = 0
+            nodes[(item.get('id'))] = Node(
+                (item.get('id')), coords, el)
+        elif item.tag == 'way':
+            if item.get('id') == '157161112':  # main coastline way ID
+                for thing in item:
+                    if thing.tag == 'nd':
+                        coastnodes.append((thing.get('ref')))
+                continue
+            useme = False
+            oneway = False
+            myname = 'unnamed way'
+            for thing in item:
+                if thing.tag == 'tag' and thing.get('k') == 'highway':
+                    useme = True
+                    mytype = thing.get('v')
+                if thing.tag == 'tag' and thing.get('k') == 'name':
+                    myname = thing.get('v')
+                if thing.tag == 'tag' and thing.get('k') == 'oneway':
+                    if thing.get('v') == 'yes':
+                        oneway = True
+            if useme:
+                wayid = (item.get('id'))
+                ways[wayid] = Way(myname, mytype)
+                nlist = []
+                for thing in item:
+                    if thing.tag == 'nd':
+                        nlist.append((thing.get('ref')))
+                thisn = nlist[0]
+                for n in range(len(nlist)-1):
+                    nextn = nlist[n+1]
+                    nodes[thisn].ways.append(
+                        Edge(ways[wayid], nodes[thisn], nodes[nextn]))
+                    thisn = nextn
+                if not oneway:
+                    thisn = nlist[-1]
+                    for n in range(len(nlist)-2, -1, -1):
+                        nextn = nlist[n]
+                        nodes[thisn].ways.append(
+                            Edge(ways[wayid], nodes[thisn], nodes[nextn]))
+                        thisn = nextn
+                ways[wayid].nodes = nlist
+    print(len(coastnodes))
+    print(coastnodes[0])
+    print(nodes[coastnodes[0]])
+    return nodes, ways, coastnodes
