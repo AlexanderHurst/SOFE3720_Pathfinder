@@ -28,14 +28,20 @@ class Node():
             for w in self.ways:
                 wayset.add(w.way.name)
             for w in wayset:
-                self.waystr += w.encode("utf-8") + " "
+                self.waystr += w + " "
         return self.waystr
+
+    def get_str(self):
+        return (str(self.id) + "\n" + str(self.pos) + "\n" + str(self.elev))
 
     def node_dist(self, n2):
         ''' Distance between nodes self and n2, in meters. '''
         dx = (n2.pos[0]-self.pos[0]) * constants.MPERLON
         dy = (n2.pos[1]-self.pos[1]) * constants.MPERLAT
         return math.sqrt(dx*dx+dy*dy)  # in meters
+
+    def add_way(self, edge):
+        self.ways.append(edge)
 
 
 class Edge():
@@ -48,7 +54,7 @@ class Edge():
         self.cost = src.node_dist(self.dest)
         if self.dest.elev > src.elev:
             self.cost += (self.dest.elev-src.elev)*2
-            if self.way.type == 'steps':
+            if self.way.t == 'steps':
                 self.cost *= 1.5
 
 
@@ -61,6 +67,12 @@ class Way():
         self.name = name
         self.t = t
         self.nodes = []
+
+    def set_nodes(self, nodes):
+        self.nodes = nodes
+
+    def __str__(self):
+        return self.name + " " + self.t
 
 
 class Planner():
@@ -107,78 +119,88 @@ class Planner():
         ways.reverse()
         return nodes, ways
 
-
-def build_elevs(efilename):
-    ''' read in elevations from a file. '''
-    efile = open(efilename)
-    estr = efile.read()
-    elevs = []
-    for spot in range(0, len(estr), 2):
-        elevs.append(struct.unpack('>h', estr[spot:spot+2])[0])
-    return elevs
+# TODO: add data range for elevation
+#       automatically detect and adjust for north / south, east / west coordinates
+#       add suport for crossing equator, prime meridian
 
 
-def build_graph(elevs):
+def build_graph(elevs, street_data, num_hgt_dim):
     ''' Build the search graph from the OpenStreetMap XML. '''
-    tree = ET.parse('dbv.osm')
-    root = tree.getroot()
+
+    root = street_data.getroot()
 
     nodes = dict()
     ways = dict()
-    coastnodes = []
+
     for item in root:
+
         if item.tag == 'node':
-            coords = ((float)(item.get('lat')), (float)(item.get('lon')))
-            # row is 0 for 43N, 1201 (EPIX) for 42N
-            erow = (int)((43 - coords[0]) * constants.EPIX)
-            # col is 0 for 18 E, 1201 for 19 E
-            ecol = (int)((coords[1]-18) * constants.EPIX)
+            coords = [float(item.get('lat')), float(item.get('lon'))]
+
+            # row is 0 for bottom of hgt data, max (usually 1201 or 3601) for top
+            erow = (int)(abs((coords[0]-constants.HGT_BOT)) * num_hgt_dim)
+            # col is 0 for far left of hgt data, max (usually 1201 or 3601) for top
+            ecol = (int)(abs(1 - (coords[1]-constants.HGT_LEFT)) * num_hgt_dim)
+
             try:
-                el = elevs[erow*constants.EPIX+ecol]
+                el = elevs[erow, ecol]
+
             except IndexError:
+                str = "Point is too far: "
+                if coords[0] >= constants.HGT_BOT + 1:
+                    str += "North, "
+                if coords[0] <= constants.HGT_BOT:
+                    str += "South, "
+                if coords[1] >= constants.HGT_LEFT + 1:
+                    str += "East, "
+                if coords[1] <= constants.HGT_LEFT:
+                    str += "West, "
+                str = str[:-2]
+                print(str, coords)
                 el = 0
             nodes[(item.get('id'))] = Node(
                 (item.get('id')), coords, el)
+
         elif item.tag == 'way':
-            if item.get('id') == '157161112':  # main coastline way ID
-                for thing in item:
-                    if thing.tag == 'nd':
-                        coastnodes.append((thing.get('ref')))
-                continue
-            useme = False
+            usable = False
             oneway = False
-            myname = 'unnamed way'
-            for thing in item:
-                if thing.tag == 'tag' and thing.get('k') == 'highway':
-                    useme = True
-                    mytype = thing.get('v')
-                if thing.tag == 'tag' and thing.get('k') == 'name':
-                    myname = thing.get('v')
-                if thing.tag == 'tag' and thing.get('k') == 'oneway':
-                    if thing.get('v') == 'yes':
+            name = 'unnamed way'
+            # sets the usability, name and whether the way is one way
+            for elem in item:
+                if elem.tag == 'tag' and elem.get('k') == 'highway':
+                    usable = True
+                    waytype = elem.get('v')
+                if elem.tag == 'tag' and elem.get('k') == 'name':
+                    name = elem.get('v')
+                if elem.tag == 'tag' and elem.get('k') == 'oneway':
+                    if elem.get('v') == 'yes':
                         oneway = True
-            if useme:
+            # if the way is usable add it to the ways
+            if usable:
                 wayid = (item.get('id'))
-                ways[wayid] = Way(myname, mytype)
+                ways[wayid] = Way(name, waytype)
                 nlist = []
-                for thing in item:
-                    if thing.tag == 'nd':
-                        nlist.append((thing.get('ref')))
+                # add all of the ref nodes to the node list
+                for elem in item:
+                    if elem.tag == 'nd':
+                        nlist.append((elem.get('ref')))
+                # starting with the first node
                 thisn = nlist[0]
                 for n in range(len(nlist)-1):
                     nextn = nlist[n+1]
-                    nodes[thisn].ways.append(
+                    # add the way to get to the next referenced node
+                    nodes[thisn].add_way(
                         Edge(ways[wayid], nodes[thisn], nodes[nextn]))
+                    # move to the next node
                     thisn = nextn
+                # if the road is not one way do the same thing in reverse
                 if not oneway:
                     thisn = nlist[-1]
                     for n in range(len(nlist)-2, -1, -1):
                         nextn = nlist[n]
-                        nodes[thisn].ways.append(
+                        nodes[thisn].add_way(
                             Edge(ways[wayid], nodes[thisn], nodes[nextn]))
                         thisn = nextn
-                ways[wayid].nodes = nlist
-    print(len(coastnodes))
-    print(coastnodes[0])
-    print(nodes[coastnodes[0]])
-    return nodes, ways, coastnodes
+                # save the node list in the way
+                ways[wayid].set_nodes(nlist)
+    return (nodes, ways)
