@@ -22,10 +22,11 @@ class PlanWin(tk.Frame):
 
     def lat_lon_to_elev(self, latlon):
         # row is 0 for 43N, 1201 (EPIX) for 42N
-        row = (int)((round(constants.TOPLAT) - latlon[0]) * constants.EPIX)
+        row = (int)((constants.HGT_BOT - latlon[0]) * self.dim)
         # col is 0 for 18 E, 1201 for 19 E
-        col = (int)((latlon[1]-round(constants.LEFTLON)) * constants.EPIX)
-        return self.elevs[row*constants.EPIX+col]
+        col = (int)((latlon[1]-constants.HGT_LEFT) * self.dim)
+        print(row, col)
+        return self.elevs[row, col]
 
     def maphover(self, event):
         self.elab.configure(text=str(self.pix_to_elev(event.x, event.y)))
@@ -91,7 +92,7 @@ class PlanWin(tk.Frame):
             # print node.id
         self.canvas.coords('path', *coords)
 
-    def __init__(self, master, nodes, ways, coastnodes, elevs):
+    def __init__(self, master, nodes, ways, elevs, dim):
         self.whatis = {}
         self.nodes = nodes
         self.ways = ways
@@ -99,6 +100,7 @@ class PlanWin(tk.Frame):
         self.startnode = None
         self.goalnode = None
         self.planner = Planner(nodes, ways)
+        self.dim = dim
         thewin = tk.Frame(master)
         # , cursor="crosshair")
         w = tk.Canvas(thewin, width=constants.WINWID, height=constants.WINHGT)
@@ -115,13 +117,6 @@ class PlanWin(tk.Frame):
                              (nextpix[1]))] = nlist[n+1]
                 w.create_line(thispix[0], thispix[1], nextpix[0], nextpix[1])
                 thispix = nextpix
-        thispix = self.lat_lon_to_pix(self.nodes[coastnodes[0]].pos)
-        # also draw the coast:
-        for n in range(len(coastnodes)-1):
-            nextpix = self.lat_lon_to_pix(self.nodes[coastnodes[n+1]].pos)
-            w.create_line(thispix[0], thispix[1],
-                          nextpix[0], nextpix[1], fill="blue")
-            thispix = nextpix
 
         # other visible things are hiding for now...
         w.create_line(0, 0, 0, 0, fill='orange', width=3, tag='path')
