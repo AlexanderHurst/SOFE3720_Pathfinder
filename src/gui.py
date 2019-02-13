@@ -29,9 +29,10 @@ class PlanWin(tk.Frame):
 
     def lat_lon_to_elev(self, latlon):
         # row is 0 for 43N, 1201 (EPIX) for 42N
-        row = (int)(((constants.HGT_BOT + 1) - latlon[0]) * self.dim)
+        row = (int)((1-((constants.HGT_BOT + 1) - latlon[0])) * self.dim)
         # col is 0 for 18 E, 1201 for 19 E
         col = (int)(((latlon[1]-constants.HGT_LEFT)) * self.dim)
+        print(row, col)
         return self.elevs[row, col]
 
     def maphover(self, event):

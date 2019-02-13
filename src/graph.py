@@ -163,10 +163,10 @@ def build_graph(elevs, street_data, num_hgt_dim):
             coords = [float(item.get('lat')), float(item.get('lon'))]
 
             # row is 0 for bottom of hgt data, max (usually 1201 or 3601) for top
-            erow = (int)(abs((coords[0]-constants.HGT_BOT)) * num_hgt_dim)
+            erow = (int)(
+                (1 - ((constants.HGT_BOT + 1) - coords[0])) * num_hgt_dim)
             # col is 0 for far left of hgt data, max (usually 1201 or 3601) for top
-            ecol = (int)(abs(1 - (coords[1]-constants.HGT_LEFT)) * num_hgt_dim)
-
+            ecol = (int)((coords[1]-constants.HGT_LEFT) * num_hgt_dim)
             try:
                 el = elevs[erow, ecol]
 
@@ -181,7 +181,7 @@ def build_graph(elevs, street_data, num_hgt_dim):
                 if coords[1] <= constants.HGT_LEFT:
                     str += "West, "
                 str = str[:-2]
-                print(str, coords)
+                # print(str, coords)
                 el = 0
             nodes[(item.get('id'))] = Node(
                 (item.get('id')), coords, el)
