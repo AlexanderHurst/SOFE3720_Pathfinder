@@ -13,19 +13,25 @@ class PlanWin(tk.Frame):
                  'planner', 'lastnode', 'startnode', 'goalnode')
 
     def lat_lon_to_pix(self, latlon):
+        # convert lat lon location to pixel coordinates
+        # lon - furthest left location (most negative) * conversion
         x = (latlon[1]-constants.LEFTLON)*(constants.TOXPIX)
         y = (constants.TOPLAT-latlon[0])*(constants.TOYPIX)
         return x, y
 
     def pix_to_elev(self, x, y):
+        # print(constants.TOPLAT, " - ", y, " / ", constants.TOYPIX,
+        #       " = ", constants.TOPLAT-(y/constants.TOYPIX))
+        # print(x, " / ", constants.TOXPIX, " + ", constants.LEFTLON,
+        #       " = ", (x/constants.TOXPIX)+constants.LEFTLON)
+
         return self.lat_lon_to_elev(((constants.TOPLAT-(y/constants.TOYPIX)), ((x/constants.TOXPIX)+constants.LEFTLON)))
 
     def lat_lon_to_elev(self, latlon):
         # row is 0 for 43N, 1201 (EPIX) for 42N
-        row = (int)((constants.HGT_BOT - latlon[0]) * self.dim)
+        row = (int)(((constants.HGT_BOT + 1) - latlon[0]) * self.dim)
         # col is 0 for 18 E, 1201 for 19 E
-        col = (int)((latlon[1]-constants.HGT_LEFT) * self.dim)
-        print(row, col)
+        col = (int)(((latlon[1]-constants.HGT_LEFT)) * self.dim)
         return self.elevs[row, col]
 
     def maphover(self, event):
@@ -107,8 +113,11 @@ class PlanWin(tk.Frame):
         w.bind("<Button-1>", self.mapclick)
         w.bind("<Motion>", self.maphover)
         for waynum in self.ways:
+            # for every way get the nodes
             nlist = self.ways[waynum].nodes
+            # get the pixel location for the first node
             thispix = self.lat_lon_to_pix(self.nodes[nlist[0]].pos)
+            # print("this pix", thispix, self.nodes[nlist[0]].pos)
             if len(self.nodes[nlist[0]].ways) > 2:
                 self.whatis[((int)(thispix[0]), (int)(thispix[1]))] = nlist[0]
             for n in range(len(nlist)-1):
