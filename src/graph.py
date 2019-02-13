@@ -171,16 +171,16 @@ def build_graph(elevs, street_data, num_hgt_dim):
                 el = elevs[erow, ecol]
 
             except IndexError:
-                str = "Point is too far: "
-                if coords[0] >= constants.HGT_BOT + 1:
-                    str += "North, "
-                if coords[0] <= constants.HGT_BOT:
-                    str += "South, "
-                if coords[1] >= constants.HGT_LEFT + 1:
-                    str += "East, "
-                if coords[1] <= constants.HGT_LEFT:
-                    str += "West, "
-                str = str[:-2]
+                # str = "Point is too far: "
+                # if coords[0] >= constants.HGT_BOT + 1:
+                #     str += "North, "
+                # if coords[0] <= constants.HGT_BOT:
+                #     str += "South, "
+                # if coords[1] >= constants.HGT_LEFT + 1:
+                #     str += "East, "
+                # if coords[1] <= constants.HGT_LEFT:
+                #     str += "West, "
+                # str = str[:-2]
                 # print(str, coords)
                 el = 0
             nodes[(item.get('id'))] = Node(
