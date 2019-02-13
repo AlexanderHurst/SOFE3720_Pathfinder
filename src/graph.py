@@ -21,6 +21,7 @@ class Node():
             self.waystr = self.get_waystr()
         return str(self.pos) + ": " + self.waystr
 
+    # creates a string with all the ways connected to the node
     def get_waystr(self):
         if self.waystr is None:
             self.waystr = ""
@@ -31,6 +32,7 @@ class Node():
                 self.waystr += w + " "
         return self.waystr
 
+    # quick string representation without the list of ways
     def get_str(self):
         return (str(self.id) + "\n" + str(self.pos) + "\n" + str(self.elev))
 
@@ -52,10 +54,10 @@ class Edge():
         self.way = way
         self.dest = dest
         self.cost = src.node_dist(self.dest)
+
+        # if uphill add uphill penalty
         if self.dest.elev > src.elev:
-            self.cost += (self.dest.elev-src.elev)*2
-            if self.way.t == 'steps':
-                self.cost *= 1.5
+            self.cost += (self.dest.elev-src.elev)*1.25
 
 
 class Way():
@@ -87,34 +89,57 @@ class Planner():
         Standard A* search
         '''
         parents = {}
-        costs = {}
-        q = PriorityQueue()
-        q.put(start)
+        cost, cost_est = {}, {}
         parents[start] = None
-        costs[start] = 0
-        while not q.empty():
-            cnode = q.get()
-            if cnode == goal:
-                print("Path found, time will be",
-                      costs[goal]*60/5000)  # 5 km/hr on flat
-                return self.make_path(parents, goal)
-            for edge in cnode.ways:
-                newcost = costs[cnode] + edge.cost
-                if edge.dest not in parents or newcost < costs[edge.dest]:
-                    parents[edge.dest] = (cnode, edge.way)
-                    costs[edge.dest] = newcost
-                    q.put(edge.dest)
+        # remember the cost to get to the node
+        cost[start] = 0
+        # use heuristic to assign a cost estimate
+        # in this case, euclidean distance (elevation not included)
+        cost_est[start] = start.node_dist(goal)
 
-    def make_path(self, par, new):
+        # priority queue, holds the node sorted by
+        # the cost to the node + estimated cost to the finish
+        q = PriorityQueue()
+        q.put((cost_est, start))
+
+        while not q.empty():
+            # get the lowest element in the queue by cost_est
+            cur_node = q.get()
+            if cur_node[1] == goal:
+                print("Path found, time will be",
+                      round(cost[goal]*60/5000), " minutes")  # 5 km/hr on flat
+                # make the path
+                return self.make_path(parents, goal)
+            for edge in cur_node[1].ways:
+                # new est cost is the current cost to get to the current node
+                # + cost to get to the edge dest
+                # + heuristic cost to get to goal from the edge dest
+                new_est_cost = cost[cur_node[1]] + \
+                    edge.cost + edge.dest.node_dist(goal)
+                if edge.dest not in parents or new_est_cost < cost_est[edge.dest]:
+                    # keep track of the path
+                    parents[edge.dest] = (cur_node[1], edge.way)
+                    # update the est cost
+                    cost_est[edge.dest] = new_est_cost
+                    # set the cost to edge dest
+                    cost[edge.dest] = cost[cur_node[1]] + edge.cost
+                    # put the edge dest in the queue
+                    q.put((new_est_cost, edge.dest))
+
+    def make_path(self, path, goal):
         nodes = []
         ways = []
-        curr = new
-        nodes.append(curr)
-        while par[curr] is not None:
-            prev, way = par[curr]
+        curr = goal
+        nodes.append(goal)
+        while path[curr] is not None:
+            # get the previous node and path
+            prev, way = path[curr]
+            # add these to their own lists
             ways.append(way.name)
             nodes.append(prev)
+            # move to the next, previous node
             curr = prev
+        # reverse lists to put goal last, start first
         nodes.reverse()
         ways.reverse()
         return nodes, ways
