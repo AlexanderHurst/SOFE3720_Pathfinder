@@ -18,3 +18,6 @@ TOYPIX = WINHGT/HEIGHT
 # approximate number of meters per degree of latitude
 MPERLAT = 111000
 MPERLON = MPERLAT*LONRATIO
+# mouse accuracy buffer
+ACCURACY_TOLERANCE = [(0, 0), (-1, 0), (0, -1), (1, 0),
+                      (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
