@@ -1,6 +1,7 @@
 import constants
 import tkinter as tk
 from graph import Planner
+import time
 
 
 class PlanWin(tk.Frame):
@@ -103,12 +104,14 @@ class PlanWin(tk.Frame):
 
     def plan_path(self):
         ''' Path button callback, plans and then draws path.'''
-        print("Planning!")
         if self.startnode is None or self.goalnode is None:
             print("Sorry, not enough info.")
             return
-        print("From", self.startnode.id, "to", self.goalnode.id)
+        print("Planning! Starting Timer")
+        start_time = time.time()
         nodes, ways = self.planner.plan(self.startnode, self.goalnode)
+        print("Time taken to plan:", time.time() - start_time)
+        print("From", self.startnode.id, "to", self.goalnode.id)
         lastway = ""
         # iterate through the ways printing each one
         for wayname in ways:
